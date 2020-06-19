@@ -4,55 +4,103 @@
       <v-list-group v-for="(collection, i) in collections" :key="i">
         <template v-slot:activator>
           <v-list-item-action>
-            <v-btn @click.stop="dialog = true; getRecommendedFields(collection)" icon>
+            <v-btn
+              @click.stop="
+                dialog = true;
+                getRecommendedFields(collection);
+              "
+              icon
+            >
               <v-icon color="grey lighten-1">mdi-plus</v-icon>
             </v-btn>
           </v-list-item-action>
-          <v-dialog v-model="dialog" max-width="500">
+          <v-dialog v-model="dialog" max-width="700">
             <v-card>
               <v-card-title class="headline">{{ i }}</v-card-title>
 
               <v-card-subtitle>Add new record</v-card-subtitle>
-              <v-card-text v-if="recommendedFields.length > 0"
-                >Here are some fields found in other records:</v-card-text
-              >
-
-              <v-chip-group>
-                <v-chip
-                  @click.stop="fields.push(chip); removeFromArray(chip, recommendedFields)"
-                  v-for="chip in recommendedFields"
-                  :key="chip"
+              <div v-if="recommendedFields.length > 0">
+                <v-card-text
+                  >Here are some fields found in other records:</v-card-text
                 >
-                  {{ chip }}
-                  <v-icon small right>mdi-plus</v-icon>
-                </v-chip>
-              </v-chip-group>
+
+                <v-chip-group>
+                  <v-chip
+                    @click.stop="addField(chip)"
+                    v-for="chip in recommendedFields"
+                    :key="chip"
+                  >
+                    {{ chip }}
+                    <v-icon small right>mdi-plus</v-icon>
+                  </v-chip>
+                </v-chip-group>
+              </div>
+              <v-row class="width: 100%">
+                <v-text-field
+                  class="px-5"
+                  v-model="newRecordName"
+                  label="Record Name"
+                ></v-text-field
+                ><v-btn icon @click.stop="randomiseName"
+                  ><v-icon>mdi-dice-multiple-outline</v-icon></v-btn
+                >
+              </v-row>
+
               <v-list>
-                <v-list-item v-for="record in fields" :key="record">
-                  <v-text-field :value="record" label="Key">{{ record }}</v-text-field>
-                  <v-text-field label="Value"></v-text-field>
+                <v-list-item v-for="(newValue, newKey) in fields" :key="newKey">
+                  <v-text-field :value="newKey" label="Key" class="px-2">{{
+                    newKey
+                  }}</v-text-field>
+                  <v-text-field
+                    label="Value"
+                    class="px-2"
+                    v-model="fields[newKey]"
+                  ></v-text-field>
+                  <v-btn icon @click="fields[newKey] = nil"
+                    ><v-icon>mdi-delete</v-icon></v-btn
+                  >
                 </v-list-item>
                 <v-list-item>
-              <v-text-field :value="record" label="Key"></v-text-field>
-                <v-text-field label="Value"></v-text-field>
+                  <v-text-field
+                    value=""
+                    label="Key"
+                    class="px-2"
+                  ></v-text-field>
+                  <v-text-field label="Value" class="px-2"></v-text-field>
+                  <v-btn icon disabled><v-icon>mdi-delete</v-icon></v-btn>
                 </v-list-item>
-                
               </v-list>
               <v-card-actions>
                 <v-spacer></v-spacer>
 
-                <v-btn color="green darken-1" text @click="dialog = false;">
+                <v-btn
+                  color="green darken-1"
+                  text
+                  @click="
+                    dialog = false;
+                    printTable(fields);
+                  "
+                >
                   Close
                 </v-btn>
 
-                <v-btn color="green darken-1" text @click="dialog = false">
+                <v-btn
+                  color="green darken-1"
+                  text
+                  @click="addRecord(i, fields, newRecordName)"
+                >
                   Add Record
                 </v-btn>
               </v-card-actions>
             </v-card>
           </v-dialog>
           <v-list-item-content>
-            <v-list-item-title>{{ i }}</v-list-item-title>
+            <v-list-item-title
+              >{{ i }}
+              <span class="font-italic"
+                >({{ Object.keys(collection).length }})</span
+              ></v-list-item-title
+            >
           </v-list-item-content>
         </template>
         <v-list-group
@@ -98,7 +146,7 @@
                 <v-col cols="1">
                   <v-row v-if="editing_id == doc_id && editing_key == key" icon>
                     <v-btn icon>
-                      <v-icon v-on:click="saveEdit(doc_id, key, collection, i)"
+                      <v-icon @click="saveEdit(doc_id, key, collection, i)"
                         >mdi-check</v-icon
                       >
                     </v-btn>
@@ -106,10 +154,11 @@
                       <v-icon v-on:click="cancelEdit">mdi-close</v-icon>
                     </v-btn>
                   </v-row>
-
-                  <v-btn v-else v-on:click="editItem(doc_id, key, value)" icon
-                    ><v-icon>mdi-pencil-outline</v-icon></v-btn
-                  >
+                  <v-row v-else>
+                    <v-btn v-on:click="editItem(doc_id, key, value)" icon
+                      ><v-icon>mdi-pencil-outline</v-icon></v-btn
+                    >
+                  </v-row>
                 </v-col>
               </v-row>
             </v-list-item-content>
@@ -132,20 +181,54 @@ export default {
       editing_id: null,
       editing_key: null,
       edit_value: null,
-      fields: [],
-      recommendedFields: []
+      fields: {},
+      recommendedFields: [],
+      newRecordName: ""
     };
   },
   methods: {
+    randomiseName() {
+      var result = "";
+      var characters =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+      var charactersLength = characters.length;
+      for (var i = 0; i < 16; i++) {
+        result += characters.charAt(
+          Math.floor(Math.random() * charactersLength)
+        );
+      }
+      this.newRecordName = result;
+    },
+    addRecord(collection_name, record, name) {
+      if (name.length < 1) {
+        return;
+      }
+      this.dialog = false;
+      db.collection(collection_name)
+        .doc(name)
+        .set(record, { merge: true })
+        .then(() => console.log("Coool shoudl work"))
+        .catch(function(error) {
+          console.log("Error writing document: ", error);
+        });
+      this.newRecordName = "";
+    },
+    addField(chip) {
+      this.fields[chip] = "";
+      this.removeFromArray(chip, this.recommendedFields);
+    },
+    printTable(t) {
+      console.log(t);
+    },
     removeFromArray(element, array) {
-      for(var i = array.length - 1; i >= 0; i--) {
-    if(array[i] === element) {
-        array.splice(i, 1);
-    }
-}
+      for (var i = array.length - 1; i >= 0; i--) {
+        if (array[i] === element) {
+          array.splice(i, 1);
+        }
+      }
     },
     getRecommendedFields(collection) {
-      this.fields = [];
+      this.fields = {};
       var recos = [];
       for (var key in collection) {
         for (var key2 in collection[key]) {
@@ -186,22 +269,23 @@ export default {
     saveEdit(id, key, collection, collection_name, event) {
       let editVal = this.edit_value;
       if (event == null || event.key == "Enter") {
-        collection[id][key] = this.edit_value;
-        console.log(collection_name);
         var out = {};
         out[key] = editVal;
+
         db.collection(collection_name)
           .doc(id)
           .set(out, { merge: true })
-          .then(() =>
+          .then(() => {
             console.log(
               `Document successfully written!\nWritten ${editVal} to ${key}!`
-            )
-          )
+            );
+            this.cancelEdit();
+          })
           .catch(function(error) {
             console.log("Error writing document: ", error);
           });
       }
+      this.cancelEdit();
       // else absorb
     },
     async getCollections() {
